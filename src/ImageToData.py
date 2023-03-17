@@ -2,10 +2,48 @@ import numpy as np
 from tifffile import imread
 from math import log
 import numba as nb
+import pandas as pd
 
 from pymage_size import get_image_size
 
 from Lib.texture import graycomatrix
+
+from functools import lru_cache
+
+methods = [
+    "SHG Intensity Mean",
+    "SHG Intensity MAD",
+    "SHG Intensity Contrast",
+    "SHG Intensity Correlation",
+    "SHG Intensity Entropy",
+    "SHG Intensity ASM",
+    "SHG Intensity IDM",
+    "R-Ratio Mean",
+    "R-Ratio MAD",
+    "R-Ratio Contrast",
+    "R-Ratio Correlation",
+    "R-Ratio Entropy",
+    "R-Ratio ASM",
+    "Degree of Circular Polarization Mean",
+    "Degree of Circular Polarization MAD",
+    "Degree of Circular Polarization Contrast",
+    "Degree of Circular Polarization Correlation",
+    "Degree of Circular Polarization Entropy",
+    "Degree of Circular Polarization ASM",
+    "Degree of Circular Polarization IDM",
+    "SHG-CD MAD",
+    "SHG-CD Contrast",
+    "SHG-CD Correlation",
+    "SHG-CD Entropy",
+    "SHG-CD ASM",
+    "SHG-CD IDM",
+    "SHG-LD MAD",
+    "SHG-LD Contrast",
+    "SHG-LD Correlation",
+    "SHG-LD Entropy",
+    "SHG-LD ASM",
+    "SHG-LD IDM"
+]
 
 class ImageToData:
     def __init__(self, path: str):
@@ -68,6 +106,9 @@ class ImageToData:
         self.offset_row = offset_row
         self.offset_col = offset_col
         self.P = graycomatrix(self.img, offset_row, offset_col, levels=self.levels, normed=True) 
+
+        self.mu = [np.sum(self.P[:, 0] * self.P[:, 2]), np.sum(self.P[:, 1] * self.P[:, 2])]
+        self.sigma = [np.sqrt(np.sum(self.P[:, 2] * np.square(self.P[:, 0] - self.mu[0]))), np.sqrt(np.sum(self.P[:, 2] * np.square(self.P[:, 1] - self.mu[1])))]
         
 
     def getMean(self):
@@ -81,22 +122,19 @@ class ImageToData:
             return P[2] * (P[1] - P[0]) ** 2
         
         contrastVectorize = np.vectorize(contrast, signature='(3)->()')
+
         return np.sum(contrastVectorize(self.P))
         
 
     def getCorrelation(self):
-        # def getMu(p, axis):
-        #     def getLocalMu(x):
-        #         if axis == 0:
-        #             return np.sum(x * self.P[x, :])
-        #         elif axis == 1:
-        #             return np.sum(x * self.P[:, x])
-        #     getLocalMuVectorize = np.vectorize(getLocalMu, signature="(3)->()")
-        #     return np.sum(getLocalMuVectorize(p))
         
-
-        def getSigma(axis):
-            pass
+        def getMu(P, axis):
+            return self.mu[axis]
+        
+        def getSigma(P, axis):
+            return self.sigma[axis]
+        
+        return np.sum((self.P[:, 0] - getMu(self.P, 0)) * (self.P[:, 0] - getMu(self.P, 1)) * self.P[:, 2] / (getSigma(self.P, 0) * getSigma(self.P, 1)))
 
     def getEntropy(self):
         def entropy(p):
@@ -123,6 +161,16 @@ class ImageToData:
 # itd = ImageToData("/home/ygrik/shared/Projects/DataForCourseWork/montage1.tiff")
 itd = ImageToData("../DataForCourseWork/montage1.tiff")
 
-itd.setImg(5000, 5000, 25, 25)
-itd.setP(1, 0)
-print(list(itd.getMethodResult("Degree of Circular Polarization")))
+data = pd.DataFrame(columns=methods)
+
+for density in range(6, 7):
+    for i in range(0, itd.height - 2 ** density, 2 ** density):
+        for j in range(0, itd.width - 2 ** density, 2 ** density):
+            itd.setImg(i, j, 2 ** density, 2 ** density)
+            itd.setP(1, 0)
+            data_row = np.array([])
+            for key in itd.methods.keys():
+                data_row = np.append(data_row, list(itd.getMethodResult(key)))
+            data.add(data_row)
+            print(i, j)
+    data.to_excel(f"Data/mydata{density}.xlsx")
