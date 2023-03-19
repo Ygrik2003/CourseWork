@@ -8,7 +8,6 @@ from pymage_size import get_image_size
 
 from Lib.texture import graycomatrix
 
-from functools import lru_cache
 
 methods = [
     "SHG Intensity Mean",
@@ -107,27 +106,33 @@ class ImageToData:
         self.offset_col = offset_col
         self.P = graycomatrix(self.img, offset_row, offset_col, levels=self.levels, normed=True) 
 
-        self.mu = [np.sum(self.P[:, 0] * self.P[:, 2]), np.sum(self.P[:, 1] * self.P[:, 2])]
-        self.sigma = [np.sqrt(np.sum(self.P[:, 2] * np.square(self.P[:, 0] - self.mu[0]))), np.sqrt(np.sum(self.P[:, 2] * np.square(self.P[:, 1] - self.mu[1])))]
-        
+        self.mu = [
+            np.sum(self.P[:, 0] * self.P[:, 2]), 
+            np.sum(self.P[:, 1] * self.P[:, 2])
+        ]
+        self.sigma = [
+            np.sqrt(np.sum(self.P[:, 2] * np.square(self.P[:, 0] - self.mu[0]))),
+            np.sqrt(np.sum(self.P[:, 2] * np.square(self.P[:, 1] - self.mu[1])))
+        ]
+
 
     def getMean(self):
         return self.img.mean() / self.img.max()
 
+
     def getMAD(self):
         return np.median(np.abs(self.img - np.median(self.img))) / self.img.max()
+
 
     def getContrast(self):
         def contrast(P): # P = [i, j, p]
             return P[2] * (P[1] - P[0]) ** 2
         
         contrastVectorize = np.vectorize(contrast, signature='(3)->()')
-
         return np.sum(contrastVectorize(self.P))
         
 
     def getCorrelation(self):
-        
         def getMu(P, axis):
             return self.mu[axis]
         
@@ -159,18 +164,23 @@ class ImageToData:
 
 # itd = ImageToData("L:\\Projects\\DataForCourseWork\\montage1.tiff")
 # itd = ImageToData("/home/ygrik/shared/Projects/DataForCourseWork/montage1.tiff")
-itd = ImageToData("../DataForCourseWork/montage1.tiff")
+itd = ImageToData("D:/DataForCourseWork/montage1.tiff")
 
 data = pd.DataFrame(columns=methods)
 
-for density in range(6, 7):
-    for i in range(0, itd.height - 2 ** density, 2 ** density):
-        for j in range(0, itd.width - 2 ** density, 2 ** density):
-            itd.setImg(i, j, 2 ** density, 2 ** density)
-            itd.setP(1, 0)
-            data_row = np.array([])
-            for key in itd.methods.keys():
-                data_row = np.append(data_row, list(itd.getMethodResult(key)))
-            data.add(data_row)
-            print(i, j)
-    data.to_excel(f"Data/mydata{density}.xlsx")
+try:
+    for density in range(6, 7):
+        for i in range(0, itd.height - 2 ** density, 2 ** density):
+            print(i)
+            for j in range(0, itd.width - 2 ** density, 2 ** density):
+                itd.setImg(i, j, 2 ** density, 2 ** density)
+                itd.setP(1, 0)
+                data_row = np.array([])
+                for key in itd.methods.keys():
+                    data_row = np.append(data_row, list(itd.getMethodResult(key)))
+                data_row.flatten()
+                data = pd.concat([data, pd.DataFrame(data_row.reshape((1, -1)), columns=methods)], ignore_index=True, axis=0)
+            
+        data.to_excel(f"Data/mydata{density}.xlsx")
+except KeyboardInterrupt as e:
+    data.to_excel(f"Data/mydata000.xlsx")
