@@ -41,7 +41,8 @@ methods = [
     "SHG-LD Correlation",
     "SHG-LD Entropy",
     "SHG-LD ASM",
-    "SHG-LD IDM"
+    "SHG-LD IDM",
+    "Pixel Density"
 ]
 
 class ImageToData:
@@ -169,15 +170,16 @@ itd = ImageToData("D:/DataForCourseWork/montage1.tiff")
 data = pd.DataFrame(columns=methods)
 
 try:
-    for density in range(6, 7):
-        for i in range(0, itd.height - 2 ** density, 2 ** density):
-            print(i)
-            for j in range(0, itd.width - 2 ** density, 2 ** density):
+    for density in range(3, 10):
+        for i in range(0, itd.height - 2 ** density + 1, 2 ** density):
+            print(100 * i / (itd.height - 2 ** density))
+            for j in range(0, itd.width - 2 ** density + 1, 2 ** density):
                 itd.setImg(i, j, 2 ** density, 2 ** density)
                 itd.setP(1, 0)
                 data_row = np.array([])
                 for key in itd.methods.keys():
                     data_row = np.append(data_row, list(itd.getMethodResult(key)))
+                data_row = np.append(data_row, 4 ** density)
                 data_row.flatten()
                 data = pd.concat([data, pd.DataFrame(data_row.reshape((1, -1)), columns=methods)], ignore_index=True, axis=0)
             
