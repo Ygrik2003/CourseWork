@@ -93,14 +93,19 @@ x_axis = sum([methods[key] for key in methods.keys() if key != "Params"], [])
 # x_axis += [methods['Params'][1]]
 y_axis = methods["Params"][0]
 def getData(table_number):
-    data = pd.read_excel(io="../../Data/41598_2022_13623_MOESM3_ESM.xlsx", 
+    data = pd.read_excel(io="Data/41598_2022_13623_MOESM3_ESM.xlsx", 
     sheet_name=f"{1 << 2 * (table_number - 1)} Subimage Training")
     data = reduce_mem_usage(data)
     data = (data - data.min()) / (data.max() - data.min())
     #data["2-Group Tag"] = data[y_axis] == 2
     return data
 
-data = getData(4)
-sns.pairplot(data, hue=y_axis, x_vars=methods["Degree of Circular Polarization"], y_vars=methods["SHG-LD"])
 
-plt.show()
+for i in range(1, 10):
+    data = getData(i)
+    sns.pairplot(data, hue=y_axis, x_vars=methods["SHG-LD"], y_vars=methods["SHG-LD"])
+    plt.savefig(f"Results/SHG-LD-{i}.png")
+    sns.pairplot(data, hue=y_axis, x_vars=methods["SHG-CD"], y_vars=methods["SHG-CD"])
+    plt.savefig(f"Results/SHG-CD-{i}.png")
+
+    # plt.show()

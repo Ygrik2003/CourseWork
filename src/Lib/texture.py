@@ -54,10 +54,10 @@ import numba as nb
 #                     if 0 <= i < levels and 0 <= j < levels:
 #                         out[i, j, d_idx, a_idx] += 1
 
-# @nb.jit
+@nb.njit
 def _glcm_loop_py(image, offset_row,
-               offset_col, levels,
-               out):
+               offset_col, levels):
+    lastIndex = 0
     """Perform co-occurrence matrix accumulation.
 
     Parameters
@@ -86,6 +86,8 @@ def _glcm_loop_py(image, offset_row,
     start_col = max(0, -offset_col)
     end_col = min(cols, cols - offset_col)
 
+    out = np.zeros((np.unique(image).shape[0] ** 2, 3), dtype=np.float32)
+
     for r in range(start_row, end_row):
         for c in range(start_col, end_col):
             i = image[r, c]
@@ -94,12 +96,20 @@ def _glcm_loop_py(image, offset_row,
             col = c + offset_col
             j = image[row, col]
             if 0 <= i < levels and 0 <= j < levels:
-                if not np.any(np.all([out[:, 0] == i, out[:, 1] == j], axis=0)):
-                    out = np.append(out, [[i, j, 0]], axis=0)
+                # if not np.any(np.all([out[:, 0] == i, out[:, 1] == j], axis=0)):
+                #     out = np.append(out, [[i, j, 0]], axis=0)
 
-                out[np.all([out[:, 0] == i, out[:, 1] == j], axis=0), 2] += 1
-    return out
+                # out[np.all([out[:, 0] == i, out[:, 1] == j], axis=0), 2] += 1
+                for i_elem in range(out.shape[0]):
+                    if out[i_elem][0] == i and out[i_elem][1] == j:
+                        out[i_elem][2] = out[i_elem][2] + 1
+                        break
+                else:
+                    out[lastIndex] = [i, j, 1]
+                    lastIndex += 1
+    return out[:lastIndex]
 
+@nb.njit
 def graycomatrix(image, offset_row, offset_col, levels=None, symmetric=False,
                  normed=False):
     """Calculate the gray-level co-occurrence matrix.
@@ -204,11 +214,9 @@ def graycomatrix(image, offset_row, offset_col, levels=None, symmetric=False,
         raise ValueError("The maximum grayscale value in the image should be "
                          "smaller than the number of levels.")
 
-   
-    P = np.zeros((0, 3), dtype=np.uint16, order='C')
-    
+       
     # count co-occurences
-    P = _glcm_loop_py(image, offset_row, offset_col, levels, P)
+    P = _glcm_loop_py(image, offset_row, offset_col, levels)
 
     # make each GLMC symmetric
     if symmetric:
@@ -217,9 +225,7 @@ def graycomatrix(image, offset_row, offset_col, levels=None, symmetric=False,
 
     # normalize each GLCM
     if normed:
-        P = P.astype(np.float16)
         glcm_sums = np.sum(P[:, 2])
         glcm_sums = 1 if glcm_sums == 0 else glcm_sums
         P[:, 2] /= glcm_sums
-
     return P
